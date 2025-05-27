@@ -1,0 +1,9 @@
+name: MiningMachine
+version: '1.1-Command'
+main: org.github.WangHongMing.miningMachine.MiningMachine
+api-version: '1.21'
+
+
+commands:
+  getminingmachine:
+    description: Gives you a mining machine
