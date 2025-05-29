@@ -7,3 +7,7 @@ api-version: '1.21'
 commands:
   getminingmachine:
     description: Gives you a mining machine
+
+  removeminingmachine:
+    description: "Safely removes a mining machine"
+    usage: /removeminingmachine
