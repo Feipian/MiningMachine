@@ -10,9 +10,10 @@ import org.bukkit.event.Listener
 import org.bukkit.event.block.BlockPlaceEvent
 import org.bukkit.inventory.ItemStack
 import org.bukkit.inventory.PlayerInventory
+import org.bukkit.persistence.PersistentDataType
 import org.bukkit.plugin.java.JavaPlugin
 import org.bukkit.scheduler.BukkitRunnable
-
+import java.util.UUID
 
 
 // Example of a simple EnergyManager (can be more complex)
@@ -47,7 +48,7 @@ object EnergyManager {
 
 
 class MiningMachine : JavaPlugin(), Listener {
-    private val activeMachines = mutableMapOf<Location, BukkitRunnable>()
+    private val activeMachines = mutableMapOf<UUID, Pair<Location, BukkitRunnable>>()
     override fun onEnable() {
         // Register events
         Bukkit.getPluginManager().registerEvents(this, this)
@@ -62,6 +63,15 @@ class MiningMachine : JavaPlugin(), Listener {
                     val meta = item.itemMeta
                     meta.setDisplayName("§6Mining Machine")
                     meta.lore = listOf("§7Place to start mining!")
+
+
+                    // ADD THIS SECTION TO STORE UUID
+                    meta.persistentDataContainer.set(
+                        NamespacedKey(this, "mining_machine_id"),
+                        PersistentDataType.STRING,
+                        UUID.randomUUID().toString()
+                    )
+
                     item.itemMeta = meta
 
                     sender.inventory.addItem(item)
@@ -85,7 +95,7 @@ class MiningMachine : JavaPlugin(), Listener {
                 return@setExecutor true
             }
 
-            if (targetBlock.type != Material.DISPENSER || !activeMachines.containsKey(targetBlock.location)) {
+            if (targetBlock.type != Material.DISPENSER || !activeMachines.any { it.value.first == targetBlock.location }) {
                 sender.sendMessage(Component.text("§cNo active Mining Machine found!"))
                 return@setExecutor true
             }
@@ -99,8 +109,8 @@ class MiningMachine : JavaPlugin(), Listener {
             })
 
             // Clean up
-            activeMachines[targetBlock.location]?.cancel()
-            activeMachines.remove(targetBlock.location)
+//            activeMachines[targetBlock.location]?.cancel()
+//            activeMachines.remove(targetBlock.location)
             targetBlock.type = Material.AIR
 
             // Effects
@@ -131,19 +141,27 @@ class MiningMachine : JavaPlugin(), Listener {
     fun onBlockPlace(event: BlockPlaceEvent) {
         val block = event.blockPlaced
         val item = event.itemInHand
+        val meta = item.itemMeta ?: return
 
         if (block.type == Material.DISPENSER &&
             item.itemMeta?.displayName == "§6Mining Machine"
         ) {
+            // Get or generate the machine ID
+            val machineId = meta.persistentDataContainer.get(
+                NamespacedKey(this, "mining_machine_id"),
+                PersistentDataType.STRING
+            ) ?: UUID.randomUUID().toString()
+
             event.player.sendMessage(Component.text("Mining Machine placed!"))
-            startMiningMachine(block, event.player)
+            startMiningMachine(block, event.player, machineId)
         }
     }
 
-    private fun startMiningMachine(startBlock: Block, owner: Player) {
-        // Cancel any existing machine at this location
-        activeMachines[startBlock.location]?.cancel()
+    private fun startMiningMachine(startBlock: Block, owner: Player, machineId: String) {
+        val uuid = UUID.fromString(machineId)
 
+        // Cancel any existing machine with this ID
+        activeMachines[uuid]?.second?.cancel()
         val task = object : BukkitRunnable() {
 
 
@@ -209,7 +227,7 @@ class MiningMachine : JavaPlugin(), Listener {
                         blockData.facing = facing
                         currentPosition.block.blockData = blockData
 
-                        owner.sendMessage(Component.text("§aMined: $type §7(Energy left: $energyAfterConsumption)"))
+                        owner.sendMessage(Component.text("§aMined: $type §7(Energy left: $energyAfterConsumption) §b[Machine ID: $machineId]"))
 
                     }
 
@@ -231,7 +249,8 @@ class MiningMachine : JavaPlugin(), Listener {
 
         }
 
-        activeMachines[startBlock.location] = task
+        // Store with UUID instead of location as key
+        activeMachines[uuid] = Pair(startBlock.location, task)
         task.runTaskTimer(this, 0L, 20L)
     }
 
