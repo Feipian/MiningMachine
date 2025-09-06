@@ -12,6 +12,7 @@ very appreciate
 
 ## Todo:
 [x] Fix meet air cant forward  
+- [X] Fix when break machine , it can't stop
 [] Check does mining machine can break bedrock??
 [] When i broken mining machine it still cost coal energe
 
