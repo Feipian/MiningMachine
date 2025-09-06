@@ -19,4 +19,5 @@ very appreciate
 [ ] When oil cost all stop event 
 [ ] When Broken Mining machine stop event  
 - [ ] If in front of the mining machine will dead(get hurt)
-- 
+- [ ] store item to a box pre setting 
+- [ ] design the usage permission
