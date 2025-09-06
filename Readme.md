@@ -21,3 +21,4 @@ very appreciate
 - [ ] If in front of the mining machine will dead(get hurt)
 - [ ] store item to a box pre setting 
 - [ ] design the usage permission
+- [ ] Let Machine had Durability
