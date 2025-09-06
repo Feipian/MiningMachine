@@ -3,10 +3,12 @@ package org.github.WangHongMing.miningMachine
 import net.kyori.adventure.text.Component
 import org.bukkit.*
 import org.bukkit.block.Block
+import org.bukkit.block.BlockState
 import org.bukkit.block.data.Directional
 import org.bukkit.entity.Player
 import org.bukkit.event.EventHandler
 import org.bukkit.event.Listener
+import org.bukkit.event.block.BlockBreakEvent
 import org.bukkit.event.block.BlockPlaceEvent
 import org.bukkit.inventory.ItemStack
 import org.bukkit.inventory.PlayerInventory
@@ -14,6 +16,7 @@ import org.bukkit.persistence.PersistentDataType
 import org.bukkit.plugin.java.JavaPlugin
 import org.bukkit.scheduler.BukkitRunnable
 import java.util.UUID
+import org.bukkit.persistence.PersistentDataContainer
 
 
 // Example of a simple EnergyManager (can be more complex)
@@ -48,7 +51,8 @@ object EnergyManager {
 
 
 class MiningMachine : JavaPlugin(), Listener {
-    private val activeMachines = mutableMapOf<UUID, Pair<Location, BukkitRunnable>>()
+    private val activeMachines = mutableMapOf<UUID, BukkitRunnable>()
+
     override fun onEnable() {
         // Register events
         Bukkit.getPluginManager().registerEvents(this, this)
@@ -95,10 +99,10 @@ class MiningMachine : JavaPlugin(), Listener {
                 return@setExecutor true
             }
 
-            if (targetBlock.type != Material.DISPENSER || !activeMachines.any { it.value.first == targetBlock.location }) {
-                sender.sendMessage(Component.text("§cNo active Mining Machine found!"))
-                return@setExecutor true
-            }
+//            if (targetBlock.type != Material.DISPENSER || !activeMachines.any { it.value.first == targetBlock.location }) {
+//                sender.sendMessage(Component.text("§cNo active Mining Machine found!"))
+//                return@setExecutor true
+//            }
 
             // Return machine to inventory
             sender.inventory.addItem(ItemStack(Material.DISPENSER).apply {
@@ -152,16 +156,29 @@ class MiningMachine : JavaPlugin(), Listener {
                 PersistentDataType.STRING
             ) ?: UUID.randomUUID().toString()
 
+            // ✅ Save UUID into the block itself
+            val blockState = block.state
+            if (blockState is org.bukkit.block.TileState) {
+                val blockMeta = blockState.persistentDataContainer
+                blockMeta.set(
+                    NamespacedKey(this, "mining_machine_id"),
+                    PersistentDataType.STRING,
+                    machineId
+                )
+                blockState.update(true)
+            }
+
             event.player.sendMessage(Component.text("Mining Machine placed!"))
             startMiningMachine(block, event.player, machineId)
         }
     }
 
     private fun startMiningMachine(startBlock: Block, owner: Player, machineId: String) {
+        val plugin = this // 👈 save reference to your MiningMachine plugin
         val uuid = UUID.fromString(machineId)
 
         // Cancel any existing machine with this ID
-        activeMachines[uuid]?.second?.cancel()
+//        activeMachines[uuid]?.second?.cancel()
         val task = object : BukkitRunnable() {
 
 
@@ -227,6 +244,19 @@ class MiningMachine : JavaPlugin(), Listener {
                         blockData.facing = facing
                         currentPosition.block.blockData = blockData
 
+                        // re assign UUID to new dispather
+                        // ✅ Copy UUID to new dispenser
+                        val newState = currentPosition.block.state
+                        if (newState is org.bukkit.block.TileState) { // ✅ only TileStates have PDC
+                            val container = newState.persistentDataContainer
+                            container.set(
+                                NamespacedKey(plugin, "mining_machine_id"),
+                                PersistentDataType.STRING,
+                                machineId
+                            )
+                            newState.update(true)
+                        }
+
                         owner.sendMessage(Component.text("§aMined: $type §7(Energy left: $energyAfterConsumption) §b[Machine ID: $machineId]"))
 
                     }
@@ -247,12 +277,49 @@ class MiningMachine : JavaPlugin(), Listener {
                 }
             }
 
+
+
         }
 
         // Store with UUID instead of location as key
-        activeMachines[uuid] = Pair(startBlock.location, task)
+        activeMachines[uuid] = task
         task.runTaskTimer(this, 0L, 20L)
     }
+
+
+    @EventHandler
+    fun onBlockBreak(event: BlockBreakEvent) {
+        val block = event.block
+        logger.info("Break at ${block.location} type=${block.type}")
+
+//        if (block.type != Material.LEGACY_DISPENSER) return
+
+        val state = block.state
+        if (state !is org.bukkit.block.TileState) return
+
+        val key = NamespacedKey(this, "mining_machine_id")
+        val idStr = state.persistentDataContainer.get(key, PersistentDataType.STRING) ?: return
+        val uuid = runCatching { UUID.fromString(idStr) }.getOrNull() ?: return
+
+        logger.info("Machine UUID at block: $idStr")
+        logger.info("$activeMachines")
+        val task = activeMachines.remove(uuid) ?: return
+        logger.info("Successful remove the machine $idStr 's task")
+        task.cancel()
+
+        // Optional: prevent vanilla drops and give your custom drop
+        event.isDropItems = false
+        block.world.dropItemNaturally(block.location, ItemStack(Material.DISPENSER).apply {
+            itemMeta = itemMeta?.apply {
+                setDisplayName("§6Mining Machine")
+                lore = listOf("§7Place to start mining!")
+            }
+        })
+
+        // Let the normal break proceed (the block will disappear). You don’t need to set AIR.
+        event.player.sendMessage(Component.text("§cMining Machine destroyed and stopped."))
+    }
+
 
 
 

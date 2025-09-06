@@ -14,3 +14,8 @@ very appreciate
 [x] Fix meet air cant forward  
 [] Check does mining machine can break bedrock??
 [] When i broken mining machine it still cost coal energe
+
+[ ] When oil cost all stop event 
+[ ] When Broken Mining machine stop event  
+- [ ] If in front of the mining machine will dead(get hurt)
+- 
