@@ -22,6 +22,7 @@ dependencies {
     implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk8")
 }
 
+
 tasks {
     runServer {
         // Configure the Minecraft version for our task.

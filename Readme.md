@@ -22,3 +22,8 @@ very appreciate
 - [ ] store item to a box pre setting 
 - [ ] design the usage permission
 - [ ] Let Machine had Durability
+
+## Cloud
+- [ ] put minecraft data to docker
+- [ ] at cloud service using docker deploy Minecraft server
+- [ ] Using K8S to manage minecraft server , auto anotation and auto scale
